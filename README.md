@@ -1,5 +1,9 @@
 <img src=hawkbit_logo.png width=533 height=246 />
 
+# 🚨 Deprecated
+
+⚠️ This repository is **no longer maintained** and is deprecated.  
+
 # Eclipse hawkBit™ - Extensions collection
 
 Build: [![Circle CI](https://circleci.com/gh/eclipse/hawkbit-extensions.svg?style=shield)](https://circleci.com/gh/eclipse/hawkbit-extensions)
