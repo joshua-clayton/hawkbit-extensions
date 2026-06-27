@@ -1,5 +1,6 @@
 /**
  * Copyright (c) 2015 Bosch Software Innovations GmbH and others
+ * Patched for hawkbit 0.10.0 compatibility
  *
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
@@ -9,6 +10,7 @@
  */
 package org.eclipse.hawkbit.artifact.repository;
 
+import org.eclipse.hawkbit.artifact.ArtifactStorage;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -22,12 +24,11 @@ import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration;
 import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 
 /**
  * The Spring auto-configuration to register the necessary beans for the S3
- * artifact repository implementation.
+ * artifact storage implementation.
  */
 @Configuration
 @ConditionalOnProperty(prefix = "org.eclipse.hawkbit.artifact.repository.s3", name = "enabled", matchIfMissing = true)
@@ -55,7 +56,6 @@ public class S3RepositoryAutoConfiguration {
      * @return the {@link DefaultAWSCredentialsProviderChain} if no other
      *         {@link AWSCredentialsProvider} bean is registered.
      */
-
     @Bean
     @ConditionalOnMissingBean
     public AWSCredentialsProvider awsCredentialsProvider() {
@@ -76,14 +76,14 @@ public class S3RepositoryAutoConfiguration {
     }
 
     /**
-     * @return the {@link AmazonS3Client} if no other {@link AmazonS3} bean is
-     *         registered.
+     * @return the {@link AmazonS3} client if no other bean is registered.
      */
     @Bean
     @ConditionalOnMissingBean
     public AmazonS3 amazonS3() {
         final AmazonS3ClientBuilder s3ClientBuilder = AmazonS3ClientBuilder.standard()
-                .withCredentials(awsCredentialsProvider()).withClientConfiguration(awsClientConfiguration());
+                .withCredentials(awsCredentialsProvider())
+                .withClientConfiguration(awsClientConfiguration());
         if (StringUtils.hasLength(endpoint)) {
             final String signingRegion = StringUtils.hasLength(region) ? region : "";
             s3ClientBuilder.withEndpointConfiguration(new EndpointConfiguration(endpoint, signingRegion));
@@ -94,10 +94,11 @@ public class S3RepositoryAutoConfiguration {
     }
 
     /**
-     * @return AWS S3 repository {@link ArtifactRepository} implementation.
+     * @return AWS S3 artifact storage implementation.
      */
     @Bean
-    public ArtifactRepository artifactRepository(final S3RepositoryProperties s3Properties) {
+    @ConditionalOnMissingBean
+    public ArtifactStorage artifactStorage(final S3RepositoryProperties s3Properties) {
         return new S3Repository(amazonS3(), s3Properties);
     }
 }
