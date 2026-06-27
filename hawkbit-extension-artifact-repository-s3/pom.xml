@@ -26,6 +26,12 @@
             <scope>provided</scope>
          </dependency>
       <dependency>
+            <groupId>org.eclipse.hawkbit</groupId>
+            <artifactId>hawkbit-artifact-api</artifactId>
+            <version>${hawkbit.version}</version>
+            <scope>provided</scope>
+         </dependency>
+      <dependency>
          <groupId>com.amazonaws</groupId>
          <artifactId>aws-java-sdk-s3</artifactId>
       </dependency>
@@ -53,6 +59,7 @@
       <dependency>
          <groupId>io.qameta.allure</groupId>
          <artifactId>allure-junit5</artifactId>
+         <version>2.25.0</version>
          <scope>test</scope>
       </dependency>
    </dependencies>

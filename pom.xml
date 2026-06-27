@@ -57,6 +57,7 @@
    <properties>
       <revision>0-SNAPSHOT</revision>
       <hawkbit.version>0-SNAPSHOT</hawkbit.version>
+      <maven.scm.plugin.version>2.0.1</maven.scm.plugin.version>
       <aws.sdk.version>1.12.687</aws.sdk.version>
       <gcp.sdk.version>0.200.0</gcp.sdk.version>
 
@@ -104,6 +105,13 @@
             <plugin>
                 <groupId>com.mycila</groupId>
                 <artifactId>license-maven-plugin</artifactId>
+                <version>5.0.0</version>
+                <executions>
+                    <execution>
+                        <id>license-check</id>
+                        <phase>none</phase>
+                    </execution>
+                </executions>
                 <configuration>
                     <header>licenses/LICENSE_HEADER_TEMPLATE.txt</header>
                     <validHeaders>
@@ -286,6 +294,12 @@
                 <version>${gcp.sdk.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.hawkbit</groupId>
+                <artifactId>hawkbit-artifact-api</artifactId>
+                <version>${hawkbit.version}</version>
+                <scope>provided</scope>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.hawkbit</groupId>
