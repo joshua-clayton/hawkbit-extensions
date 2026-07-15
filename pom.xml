@@ -36,14 +36,14 @@
 
     <distributionManagement>
         <repository>
-            <id>eclipserel</id>
-            <name>hawkBit Repository - Release</name>
-            <url>https://repo.eclipse.org/content/repositories/hawkbit-releases</url>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/joshua-clayton/hawkbit-extensions</url>
         </repository>
         <snapshotRepository>
-            <id>eclipsesnap</id>
-            <name>hawkBit Repository - Snapshots</name>
-            <url>https://repo.eclipse.org/content/repositories/hawkbit-snapshots</url>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/joshua-clayton/hawkbit-extensions</url>
         </snapshotRepository>
     </distributionManagement>
 
