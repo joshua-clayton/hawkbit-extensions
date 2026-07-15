@@ -58,8 +58,9 @@
       <revision>0-SNAPSHOT</revision>
       <hawkbit.version>0-SNAPSHOT</hawkbit.version>
       <maven.scm.plugin.version>2.0.1</maven.scm.plugin.version>
-      <aws.sdk.version>1.12.687</aws.sdk.version>
+      <aws.sdk.version>1.12.797</aws.sdk.version>
       <gcp.sdk.version>0.200.0</gcp.sdk.version>
+      <allure.version>2.25.0</allure.version>
 
       <guava.version>33.2.1-jre</guava.version>
 
@@ -312,6 +313,12 @@
                 <artifactId>hawkbit-security-core</artifactId>
                 <version>${hawkbit.version}</version>
                 <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.qameta.allure</groupId>
+                <artifactId>allure-junit5</artifactId>
+                <version>${allure.version}</version>
+                <scope>test</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>
