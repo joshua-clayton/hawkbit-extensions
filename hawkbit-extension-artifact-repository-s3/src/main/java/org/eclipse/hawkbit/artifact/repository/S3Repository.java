@@ -26,6 +26,7 @@ import org.springframework.validation.annotation.Validated;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.GetObjectRequest;
+import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
 
@@ -100,7 +101,9 @@ public class S3Repository extends AbstractArtifactStorage {
             if (!existsBySha1(tenant, base16Hashes.sha1())) {
                 final PutObjectRequest putRequest = new PutObjectRequest(s3Properties.getBucketName(), key, tempFile);
                 if (contentType != null) {
-                    putRequest.getMetadata().setContentType(contentType);
+                    final ObjectMetadata metadata = new ObjectMetadata();
+                    metadata.setContentType(contentType);
+                    putRequest.setMetadata(metadata);
                 }
                 amazonS3.putObject(putRequest);
             }
