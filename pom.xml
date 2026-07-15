@@ -47,13 +47,6 @@
         </snapshotRepository>
     </distributionManagement>
 
-    <pluginRepositories>
-        <pluginRepository>
-            <id>dash-licenses</id>
-            <url>https://repo.eclipse.org/content/repositories/dash-licenses</url>
-        </pluginRepository>
-    </pluginRepositories>
-
    <properties>
       <revision>0-SNAPSHOT</revision>
       <hawkbit.version>0.10.0</hawkbit.version>
@@ -254,19 +247,6 @@
                     </execution>
                 </executions>
             </plugin>
-            <plugin>
-                <groupId>org.eclipse.dash</groupId>
-                <artifactId>license-tool-plugin</artifactId>
-                <version>1.0.2</version>
-                <executions>
-                    <execution>
-                        <id>license-check</id>
-                        <goals>
-                            <goal>license-check</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
         </plugins>
 
         <pluginManagement>
@@ -295,12 +275,6 @@
                 <version>${gcp.sdk.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.hawkbit</groupId>
-                <artifactId>hawkbit-artifact-api</artifactId>
-                <version>${hawkbit.version}</version>
-                <scope>provided</scope>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.hawkbit</groupId>
