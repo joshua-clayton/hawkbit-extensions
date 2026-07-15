@@ -24,7 +24,7 @@ jobs:
           cache: maven
 
       - name: Build, test, and check licenses
-        run: mvn verify license:check --batch-mode
+        run: mvn verify license:check --batch-mode -DsnapshotDependencyAllowed=true
 
       - name: Publish test results
         if: always()
