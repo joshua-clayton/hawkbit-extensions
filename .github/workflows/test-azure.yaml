@@ -1,0 +1,39 @@
+name: Test Azure
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'hawkbit-extension-artifact-repository-azure/**'
+      - 'pom.xml'
+  pull_request:
+    paths:
+      - 'hawkbit-extension-artifact-repository-azure/**'
+      - 'pom.xml'
+
+jobs:
+  test-azure:
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Test hawkbit-extension-artifact-repository-azure
+        run: mvn verify --batch-mode -DsnapshotDependencyAllowed=true -pl hawkbit-extension-artifact-repository-azure -am
+
+      - name: Publish test results
+        if: always()
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          check_name: Test Results (hawkbit-extension-artifact-repository-azure)
+          files: '**/target/surefire-reports/*.xml'
