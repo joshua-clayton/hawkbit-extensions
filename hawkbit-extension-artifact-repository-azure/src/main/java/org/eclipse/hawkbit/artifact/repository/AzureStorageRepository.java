@@ -9,22 +9,24 @@
  */
 package org.eclipse.hawkbit.artifact.repository;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URISyntaxException;
-import java.util.Base64;
 
-import org.eclipse.hawkbit.artifact.repository.model.AbstractDbArtifact;
-import org.eclipse.hawkbit.artifact.repository.model.DbArtifactHash;
+import org.eclipse.hawkbit.artifact.AbstractArtifactStorage;
+import org.eclipse.hawkbit.artifact.ArtifactStorage;
+import org.eclipse.hawkbit.artifact.exception.ArtifactBinaryNotFoundException;
+import org.eclipse.hawkbit.artifact.exception.ArtifactStoreException;
+import org.eclipse.hawkbit.artifact.model.ArtifactHashes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.Assert;
 import org.springframework.validation.annotation.Validated;
 
-import com.google.common.io.BaseEncoding;
 import com.microsoft.azure.storage.CloudStorageAccount;
 import com.microsoft.azure.storage.OperationContext;
-import com.microsoft.azure.storage.ResultContinuation;
-import com.microsoft.azure.storage.ResultSegment;
 import com.microsoft.azure.storage.StorageException;
 import com.microsoft.azure.storage.blob.BlobContainerPublicAccessType;
 import com.microsoft.azure.storage.blob.BlobRequestOptions;
@@ -36,13 +38,12 @@ import com.microsoft.azure.storage.blob.CloudBlockBlob;
 import com.microsoft.azure.storage.blob.ListBlobItem;
 
 /**
- * An {@link ArtifactRepository} implementation for Azure Storage.
+ * An {@link ArtifactStorage} implementation for Azure Storage.
  */
 @Validated
-public class AzureStorageRepository extends AbstractArtifactRepository {
+public class AzureStorageRepository extends AbstractArtifactStorage {
 
     private static final Logger LOG = LoggerFactory.getLogger(AzureStorageRepository.class);
-
     private static final Logger AZURE_SDK_LOG = LoggerFactory.getLogger(CloudBlockBlob.class);
 
     private final CloudBlobClient blobClient;
@@ -50,6 +51,8 @@ public class AzureStorageRepository extends AbstractArtifactRepository {
 
     public AzureStorageRepository(final CloudStorageAccount storageAccount,
             final AzureStorageRepositoryProperties properties) {
+        Assert.notNull(storageAccount, "storageAccount cannot be null");
+        Assert.notNull(properties, "properties cannot be null");
         this.blobClient = storageAccount.createCloudBlobClient();
         this.properties = properties;
     }
@@ -58,34 +61,28 @@ public class AzureStorageRepository extends AbstractArtifactRepository {
         final CloudBlobContainer container = blobClient.getContainerReference(properties.getContainerName());
         container.createIfNotExists(BlobContainerPublicAccessType.CONTAINER, new BlobRequestOptions(),
                 new OperationContext());
-
         return container;
     }
 
     @Override
-    protected AbstractDbArtifact store(final String tenant, final DbArtifactHash base16Hashes, final String contentType,
-            final String tempFile) throws IOException {
-
-        final File file = new File(tempFile);
-
+    protected void store(final String tenant, final ArtifactHashes base16Hashes, final String contentType,
+            final File tempFile) throws IOException {
         try {
-            final CloudBlockBlob blob = getBlob(tenant, base16Hashes.getSha1());
+            final CloudBlockBlob blob = getBlob(tenant, base16Hashes.sha1());
 
-            final AzureStorageArtifact artifact = new AzureStorageArtifact(blob, base16Hashes.getSha1(), base16Hashes,
-                    file.length(), contentType);
-
-            LOG.info("Storing file {} with length {} to Azure Storage container {} in directory {}", file.getName(),
-                    file.length(), properties.getContainerName(), blob.getParent());
+            LOG.info("Storing file {} with length {} to Azure Storage container {} in directory {}",
+                    tempFile.getName(), tempFile.length(), properties.getContainerName(), blob.getParent());
 
             if (blob.exists()) {
                 LOG.debug(
                         "Artifact {} for tenant {} already exists on Azure Storage container {}, don't need to upload twice",
-                        base16Hashes.getSha1(), tenant, properties.getContainerName());
-                return artifact;
+                        base16Hashes.sha1(), tenant, properties.getContainerName());
+                return;
             }
 
-            // Creating blob and uploading file to it
-            blob.getProperties().setContentType(contentType);
+            if (contentType != null) {
+                blob.getProperties().setContentType(contentType);
+            }
 
             final OperationContext context = new OperationContext();
             context.setLoggingEnabled(true);
@@ -94,32 +91,13 @@ public class AzureStorageRepository extends AbstractArtifactRepository {
             final BlobRequestOptions options = new BlobRequestOptions();
             options.setConcurrentRequestCount(properties.getConcurrentRequestCount());
 
-            blob.uploadFromFile(tempFile, null, options, context);
+            blob.uploadFromFile(tempFile.getAbsolutePath(), null, options, context);
 
-            final String md5Base16 = convertToBase16(blob.getProperties().getContentMD5());
-
-            LOG.debug("Artifact {} stored on Azure Storage container {} with  server side Etag {} and MD5 hash {}",
-                    base16Hashes.getSha1(), blob.getContainer().getName(), blob.getProperties().getEtag(), md5Base16);
-
-            return artifact;
+            LOG.debug("Artifact {} stored on Azure Storage container {} with server side Etag {}",
+                    base16Hashes.sha1(), blob.getContainer().getName(), blob.getProperties().getEtag());
         } catch (final URISyntaxException | StorageException e) {
             throw new ArtifactStoreException("Failed to store artifact into Azure storage", e);
         }
-    }
-
-    private static String convertToBase16(final String md5Base64) {
-        if (md5Base64 == null) {
-            return null;
-        }
-
-        return BaseEncoding.base16().lowerCase().encode(Base64.getDecoder().decode(md5Base64));
-    }
-
-    private CloudBlockBlob getBlob(final String tenant, final String sha1Hash16)
-            throws URISyntaxException, StorageException {
-        final CloudBlobContainer container = getContainer();
-        final CloudBlobDirectory tenantDirectory = container.getDirectoryReference(sanitizeTenant(tenant));
-        return tenantDirectory.getBlockBlobReference(sha1Hash16);
     }
 
     @Override
@@ -137,22 +115,20 @@ public class AzureStorageRepository extends AbstractArtifactRepository {
     }
 
     @Override
-    public AbstractDbArtifact getArtifactBySha1(final String tenant, final String sha1Hash16) {
+    public InputStream getBySha1(final String tenant, final String sha1Hash16) {
         try {
             final CloudBlockBlob blob = getBlob(tenant, sha1Hash16);
-
-            if (blob == null || !blob.exists()) {
-                return null;
+            if (!blob.exists()) {
+                throw new ArtifactBinaryNotFoundException(sha1Hash16);
             }
 
             LOG.info("Loading Azure Storage blob from container {} and hash {} for tenant {}",
                     blob.getContainer().getName(), sha1Hash16, tenant);
-
-            return new AzureStorageArtifact(blob, sha1Hash16,
-                    new DbArtifactHash(sha1Hash16, convertToBase16(blob.getProperties().getContentMD5()), null),
-                    blob.getProperties().getLength(), blob.getProperties().getContentType());
+            return new BufferedInputStream(blob.openInputStream());
+        } catch (final ArtifactBinaryNotFoundException e) {
+            throw e;
         } catch (final URISyntaxException | StorageException e) {
-            throw new ArtifactStoreException("Failed to load artifact into Azure storage", e);
+            throw new ArtifactStoreException("Failed to load artifact from Azure storage", e);
         }
     }
 
@@ -166,17 +142,32 @@ public class AzureStorageRepository extends AbstractArtifactRepository {
             LOG.info("Deleting Azure Storage blob folder (tenant) from container {} for tenant {}", container.getName(),
                     tenant);
 
-            final ResultSegment<ListBlobItem> blobs = tenantDirectory.listBlobsSegmented();
-            ResultContinuation token = null;
-            do {
-                token = blobs.getContinuationToken();
-                blobs.getResults().stream().filter(CloudBlob.class::isInstance).map(CloudBlob.class::cast)
-                        .forEach(this::deleteBlob);
-            } while (token != null);
-
+            for (final ListBlobItem blobItem : tenantDirectory.listBlobs()) {
+                if (blobItem instanceof CloudBlob blob) {
+                    deleteBlob(blob);
+                }
+            }
         } catch (final URISyntaxException | StorageException e) {
             throw new ArtifactStoreException("Failed to delete tenant directory from Azure storage", e);
         }
+    }
+
+    @Override
+    public boolean existsBySha1(final String tenant, final String sha1Hash) {
+        try {
+            return getBlob(tenant, sha1Hash).exists();
+        } catch (final StorageException | URISyntaxException e) {
+            LOG.warn("Caught exception while calling getBlob() for tenant: {} and sha1Hash: {}", tenant, sha1Hash,
+                    e);
+            return false;
+        }
+    }
+
+    private CloudBlockBlob getBlob(final String tenant, final String sha1Hash16)
+            throws URISyntaxException, StorageException {
+        final CloudBlobContainer container = getContainer();
+        final CloudBlobDirectory tenantDirectory = container.getDirectoryReference(sanitizeTenant(tenant));
+        return tenantDirectory.getBlockBlobReference(sha1Hash16);
     }
 
     private void deleteBlob(final CloudBlob blob) {
@@ -184,16 +175,6 @@ public class AzureStorageRepository extends AbstractArtifactRepository {
             blob.delete();
         } catch (final StorageException e) {
             throw new ArtifactStoreException("Failed to delete tenant directory from Azure storage", e);
-        }
-    }
-
-    @Override
-    public boolean existsByTenantAndSha1(final String tenant, final String sha1Hash) {
-        try {
-            return getBlob(tenant, sha1Hash).exists();
-        } catch (StorageException | URISyntaxException e) {
-            LOG.warn("Caught Exception while calling getBlob() for tenant: {} and sha1Hash: {}", tenant, sha1Hash, e);
-            return false;
         }
     }
 }

@@ -12,6 +12,7 @@ package org.eclipse.hawkbit.artifact.repository;
 import java.net.URISyntaxException;
 import java.security.InvalidKeyException;
 
+import org.eclipse.hawkbit.artifact.ArtifactStorage;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -35,11 +36,11 @@ public class AzureStorageRepositoryAutoConfiguration {
     }
 
     /**
-     * @return Azure storage repository based {@link ArtifactRepository}
+     * @return Azure storage repository based {@link ArtifactStorage}
      *         implementation.
      */
     @Bean
-    ArtifactRepository artifactRepository(final CloudStorageAccount storageAccount,
+    ArtifactStorage artifactStorage(final CloudStorageAccount storageAccount,
             final AzureStorageRepositoryProperties properties) {
         return new AzureStorageRepository(storageAccount, properties);
     }
