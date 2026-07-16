@@ -9,18 +9,21 @@
  */
 package org.eclipse.hawkbit.artifact.repository;
 
+import static java.nio.channels.Channels.newInputStream;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Base64;
-import java.util.HexFormat;
 
 import org.apache.commons.io.IOUtils;
-import org.eclipse.hawkbit.artifact.repository.model.AbstractDbArtifact;
-import org.eclipse.hawkbit.artifact.repository.model.DbArtifactHash;
+import org.eclipse.hawkbit.artifact.AbstractArtifactStorage;
+import org.eclipse.hawkbit.artifact.ArtifactStorage;
+import org.eclipse.hawkbit.artifact.exception.ArtifactBinaryNotFoundException;
+import org.eclipse.hawkbit.artifact.model.ArtifactHashes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.Assert;
 import org.springframework.validation.annotation.Validated;
 
 import com.google.api.gax.paging.Page;
@@ -30,13 +33,12 @@ import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
 
 /**
- * An {@link ArtifactRepository} implementation for the Gcloud GCS service. All
+ * An {@link ArtifactStorage} implementation for the Gcloud GCS service. All
  * binaries are stored in single bucket using the configured name
  * {@link GcsRepositoryProperties#getBucketName()}.
- * </p>
  */
 @Validated
-public class GcsRepository extends AbstractArtifactRepository {
+public class GcsRepository extends AbstractArtifactStorage {
     private static final Logger LOG = LoggerFactory.getLogger(GcsRepository.class);
 
     private final Storage gcsStorage;
@@ -52,6 +54,8 @@ public class GcsRepository extends AbstractArtifactRepository {
      *            store in
      */
     public GcsRepository(final Storage gcsStorage, final GcsRepositoryProperties gcsProperties) {
+        Assert.notNull(gcsStorage, "gcsStorage cannot be null");
+        Assert.notNull(gcsProperties, "gcsProperties cannot be null");
         this.gcsStorage = gcsStorage;
         this.gcsProperties = gcsProperties;
     }
@@ -61,37 +65,27 @@ public class GcsRepository extends AbstractArtifactRepository {
     }
 
     @Override
-    protected AbstractDbArtifact store(final String tenant, final DbArtifactHash base16Hashes, final String contentType,
-            final String tempFile) throws IOException {
-        final File file = new File(tempFile);
+    protected void store(final String tenant, final ArtifactHashes base16Hashes, final String contentType,
+            final File tempFile) throws IOException {
+        final String key = objectKey(tenant, base16Hashes.sha1());
 
-        final GcsArtifact gcsArtifact = createGcsArtifact(tenant, base16Hashes, contentType, file);
-        final String key = objectKey(tenant, base16Hashes.getSha1());
-
-        LOG.info("Storing file {} with length {} to GCS bucket {} with key {}", file.getName(), file.length(),
+        LOG.info("Storing file {} with length {} to GCS bucket {} with key {}", tempFile.getName(), tempFile.length(),
                 gcsProperties.getBucketName(), key);
 
-        if (exists(key)) {
+        if (existsBySha1(tenant, base16Hashes.sha1())) {
             LOG.debug("Artifact {} already exists on GCS bucket {}, don't need to upload twice", key,
                     gcsProperties.getBucketName());
-            return gcsArtifact;
+            return;
         }
 
-        try (final InputStream fileStream = new FileInputStream(file)) {
+        try (InputStream fileStream = new FileInputStream(tempFile)) {
             final byte[] data = IOUtils.toByteArray(fileStream);
             final BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(gcsProperties.getBucketName(), key))
-                    .setMd5(base16Hashes.getMd5()).setContentType(contentType).build();
+                    .setMd5(base16Hashes.md5()).setContentType(contentType).build();
             final Blob blob = gcsStorage.create(blobInfo, data);
             LOG.debug("Artifact {} stored on GCS bucket {} with server side Etag {} and MD5 hash {}", key,
                     gcsProperties.getBucketName(), blob.getEtag(), blob.getMd5());
-            return gcsArtifact;
         }
-    }
-
-    private GcsArtifact createGcsArtifact(final String tenant, final DbArtifactHash hashes, final String contentType,
-            final File file) {
-        return new GcsArtifact(gcsStorage, gcsProperties, objectKey(tenant, hashes.getSha1()), hashes.getSha1(), hashes,
-                file.length(), contentType);
     }
 
     @Override
@@ -102,28 +96,15 @@ public class GcsRepository extends AbstractArtifactRepository {
     }
 
     @Override
-    public AbstractDbArtifact getArtifactBySha1(final String tenant, final String sha1Hash) {
+    public InputStream getBySha1(final String tenant, final String sha1Hash) {
         final String key = objectKey(tenant, sha1Hash);
 
         LOG.info("Retrieving GCS object from bucket {} and key {}", gcsProperties.getBucketName(), key);
         final Blob blob = gcsStorage.get(gcsProperties.getBucketName(), key);
         if (blob == null || !blob.exists()) {
-            return null;
+            throw new ArtifactBinaryNotFoundException(sha1Hash);
         }
-        // the MD5Content is stored in the ETag
-        return new GcsArtifact(gcsStorage, gcsProperties, key, sha1Hash,
-                new DbArtifactHash(sha1Hash,
-                        HexFormat.of().withLowerCase().formatHex(Base64.getDecoder().decode(blob.getMd5())), null),
-                blob.getSize(), blob.getContentType());
-
-    }
-
-    private boolean exists(final String sha1) {
-        final Blob blob = gcsStorage.get(gcsProperties.getBucketName(), sha1);
-        if (blob == null) {
-            return false;
-        }
-        return blob.exists();
+        return newInputStream(gcsStorage.reader(BlobId.of(gcsProperties.getBucketName(), key)));
     }
 
     @Override
@@ -132,15 +113,16 @@ public class GcsRepository extends AbstractArtifactRepository {
 
         LOG.info("Deleting GCS object folder (tenant) from bucket {} and key {}", gcsProperties.getBucketName(),
                 folder);
-        final Page<Blob> blobs = gcsStorage.list(gcsProperties.getBucketName(),
-                Storage.BlobListOption.currentDirectory(), Storage.BlobListOption.prefix(tenant));
+        final Page<Blob> blobs = gcsStorage.list(gcsProperties.getBucketName(), Storage.BlobListOption.currentDirectory(),
+                Storage.BlobListOption.prefix(folder + "/"));
         for (final Blob blob : blobs.iterateAll()) {
             gcsStorage.delete(blob.getBlobId());
         }
     }
 
     @Override
-    public boolean existsByTenantAndSha1(final String tenant, final String sha1Hash) {
-        return exists(objectKey(tenant, sha1Hash));
+    public boolean existsBySha1(final String tenant, final String sha1Hash) {
+        final Blob blob = gcsStorage.get(gcsProperties.getBucketName(), objectKey(tenant, sha1Hash));
+        return blob != null && blob.exists();
     }
 }
