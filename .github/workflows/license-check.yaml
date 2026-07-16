@@ -1,13 +1,6 @@
 name: License Check
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '**/*.java'
-      - '**/pom.xml'
-      - 'licenses/**'
   pull_request:
     paths:
       - '**/*.java'
