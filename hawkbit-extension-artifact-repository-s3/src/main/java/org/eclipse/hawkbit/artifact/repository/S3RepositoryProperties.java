@@ -11,8 +11,6 @@ package org.eclipse.hawkbit.artifact.repository;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import com.amazonaws.services.s3.model.SSEAlgorithm;
-
 /**
  * The AWS S3 configuration properties for the S3 artifact repository
  * implementation.
@@ -21,8 +19,6 @@ import com.amazonaws.services.s3.model.SSEAlgorithm;
 public class S3RepositoryProperties {
 
     private String bucketName = "artifactrepository";
-    private boolean serverSideEncryption = false;
-    private String serverSideEncryptionAlgorithm = SSEAlgorithm.AES256.getAlgorithm();
 
     public String getBucketName() {
         return bucketName;
@@ -30,21 +26,5 @@ public class S3RepositoryProperties {
 
     public void setBucketName(final String bucketName) {
         this.bucketName = bucketName;
-    }
-
-    public boolean isServerSideEncryption() {
-        return serverSideEncryption;
-    }
-
-    public void setServerSideEncryption(final boolean serverSideEncryption) {
-        this.serverSideEncryption = serverSideEncryption;
-    }
-
-    public String getServerSideEncryptionAlgorithm() {
-        return serverSideEncryptionAlgorithm;
-    }
-
-    public void setServerSideEncryptionAlgorithm(final String serverSideEncryptionAlgorithm) {
-        this.serverSideEncryptionAlgorithm = serverSideEncryptionAlgorithm;
     }
 }
