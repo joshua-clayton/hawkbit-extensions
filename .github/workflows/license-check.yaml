@@ -1,0 +1,31 @@
+name: License Check
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**/*.java'
+      - '**/pom.xml'
+      - 'licenses/**'
+  pull_request:
+    paths:
+      - '**/*.java'
+      - '**/pom.xml'
+      - 'licenses/**'
+
+jobs:
+  license-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Check license headers
+        run: mvn license:check --batch-mode -DsnapshotDependencyAllowed=true
