@@ -51,7 +51,7 @@
       <revision>0-SNAPSHOT</revision>
       <hawkbit.version>0.10.0</hawkbit.version>
       <maven.scm.plugin.version>2.0.1</maven.scm.plugin.version>
-      <aws.sdk.version>1.12.797</aws.sdk.version>
+      <aws.sdk.version>2.46.7</aws.sdk.version>
       <gcp.sdk.version>0.200.0</gcp.sdk.version>
       <allure.version>2.25.0</allure.version>
 
@@ -272,8 +272,8 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>com.amazonaws</groupId>
-                <artifactId>aws-java-sdk-bom</artifactId>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
                 <version>${aws.sdk.version}</version>
                 <type>pom</type>
                 <scope>import</scope>

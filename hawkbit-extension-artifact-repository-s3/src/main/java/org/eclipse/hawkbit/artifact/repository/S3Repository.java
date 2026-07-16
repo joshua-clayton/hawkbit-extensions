@@ -22,12 +22,14 @@ import org.eclipse.hawkbit.artifact.model.ArtifactHashes;
 import org.springframework.util.Assert;
 import org.springframework.validation.annotation.Validated;
 
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.AmazonS3Exception;
-import com.amazonaws.services.s3.model.GetObjectRequest;
-import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.model.PutObjectRequest;
-import com.amazonaws.services.s3.model.S3Object;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 /**
  * An {@link ArtifactStorage} implementation which stores artifacts in Amazon S3.
@@ -37,13 +39,13 @@ import com.amazonaws.services.s3.model.S3Object;
 @Validated
 public class S3Repository extends AbstractArtifactStorage {
 
-    private final AmazonS3 amazonS3;
+    private final S3Client s3Client;
     private final S3RepositoryProperties s3Properties;
 
-    public S3Repository(final AmazonS3 amazonS3, final S3RepositoryProperties s3Properties) {
-        Assert.notNull(amazonS3, "amazonS3 cannot be null");
+    public S3Repository(final S3Client s3Client, final S3RepositoryProperties s3Properties) {
+        Assert.notNull(s3Client, "s3Client cannot be null");
         Assert.notNull(s3Properties, "s3Properties cannot be null");
-        this.amazonS3 = amazonS3;
+        this.s3Client = s3Client;
         this.s3Properties = s3Properties;
     }
 
@@ -51,8 +53,11 @@ public class S3Repository extends AbstractArtifactStorage {
     public void deleteBySha1(final String tenant, final String sha1) {
         try {
             final String key = buildKey(tenant, sha1);
-            amazonS3.deleteObject(s3Properties.getBucketName(), key);
-        } catch (final AmazonS3Exception e) {
+            s3Client.deleteObject(DeleteObjectRequest.builder()
+                    .bucket(s3Properties.getBucketName())
+                    .key(key)
+                    .build());
+        } catch (final S3Exception e) {
             throw new ArtifactStoreException("Failed to delete artifact from S3: " + e.getMessage(), e);
         }
     }
@@ -64,9 +69,12 @@ public class S3Repository extends AbstractArtifactStorage {
             if (!existsBySha1(tenant, sha1)) {
                 throw new ArtifactBinaryNotFoundException(sha1);
             }
-            final S3Object s3Object = amazonS3.getObject(new GetObjectRequest(s3Properties.getBucketName(), key));
-            return new BufferedInputStream(s3Object.getObjectContent());
-        } catch (final AmazonS3Exception e) {
+            final InputStream objectContent = s3Client.getObject(GetObjectRequest.builder()
+                    .bucket(s3Properties.getBucketName())
+                    .key(key)
+                    .build());
+            return new BufferedInputStream(objectContent);
+        } catch (final S3Exception e) {
             throw new ArtifactBinaryNotFoundException(sha1);
         }
     }
@@ -75,9 +83,16 @@ public class S3Repository extends AbstractArtifactStorage {
     public void deleteByTenant(final String tenant) {
         try {
             final String prefix = tenant + "/";
-            amazonS3.listObjects(s3Properties.getBucketName(), prefix).getObjectSummaries().stream()
-                    .forEach(summary -> amazonS3.deleteObject(s3Properties.getBucketName(), summary.getKey()));
-        } catch (final AmazonS3Exception e) {
+            s3Client.listObjectsV2Paginator(ListObjectsV2Request.builder()
+                            .bucket(s3Properties.getBucketName())
+                            .prefix(prefix)
+                            .build())
+                    .contents()
+                    .forEach(s3Object -> s3Client.deleteObject(DeleteObjectRequest.builder()
+                            .bucket(s3Properties.getBucketName())
+                            .key(s3Object.key())
+                            .build()));
+        } catch (final S3Exception e) {
             throw new ArtifactStoreException("Failed to delete tenant artifacts from S3: " + e.getMessage(), e);
         }
     }
@@ -86,8 +101,12 @@ public class S3Repository extends AbstractArtifactStorage {
     public boolean existsBySha1(final String tenant, final String sha1) {
         try {
             final String key = buildKey(tenant, sha1);
-            return amazonS3.doesObjectExist(s3Properties.getBucketName(), key);
-        } catch (final AmazonS3Exception e) {
+            s3Client.headObject(HeadObjectRequest.builder()
+                    .bucket(s3Properties.getBucketName())
+                    .key(key)
+                    .build());
+            return true;
+        } catch (final S3Exception e) {
             return false;
         }
     }
@@ -98,15 +117,15 @@ public class S3Repository extends AbstractArtifactStorage {
         try {
             final String key = buildKey(tenant, base16Hashes.sha1());
             if (!existsBySha1(tenant, base16Hashes.sha1())) {
-                final PutObjectRequest putRequest = new PutObjectRequest(s3Properties.getBucketName(), key, tempFile);
+                final PutObjectRequest.Builder putRequestBuilder = PutObjectRequest.builder()
+                        .bucket(s3Properties.getBucketName())
+                        .key(key);
                 if (contentType != null) {
-                    final ObjectMetadata metadata = new ObjectMetadata();
-                    metadata.setContentType(contentType);
-                    putRequest.setMetadata(metadata);
+                    putRequestBuilder.contentType(contentType);
                 }
-                amazonS3.putObject(putRequest);
+                s3Client.putObject(putRequestBuilder.build(), RequestBody.fromFile(tempFile));
             }
-        } catch (final AmazonS3Exception e) {
+        } catch (final S3Exception e) {
             throw new ArtifactStoreException("Failed to store artifact in S3: " + e.getMessage(), e);
         }
     }

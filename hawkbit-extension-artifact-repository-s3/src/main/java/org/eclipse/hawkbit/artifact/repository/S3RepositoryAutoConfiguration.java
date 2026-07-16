@@ -9,6 +9,8 @@
  */
 package org.eclipse.hawkbit.artifact.repository;
 
+import java.net.URI;
+
 import org.eclipse.hawkbit.artifact.ArtifactStorage;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -18,12 +20,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.StringUtils;
 
-import com.amazonaws.ClientConfiguration;
-import com.amazonaws.auth.AWSCredentialsProvider;
-import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
-import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3ClientBuilder;
 
 /**
  * The Spring auto-configuration to register the necessary beans for the S3
@@ -41,53 +43,47 @@ public class S3RepositoryAutoConfiguration {
     private String endpoint;
 
     /**
-     * The {@link DefaultAWSCredentialsProviderChain} looks for credentials in
-     * this order:
+     * The {@link DefaultCredentialsProvider} resolves credentials from the
+     * standard AWS SDK v2 chain: environment variables, system properties,
+     * web identity tokens, container credentials (including EKS Pod
+     * Identity), and instance profile credentials, in that order.
      *
-     * <pre>
-     * 1. Environment Variables (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY)
-     * 2. Java System Properties (aws.accessKeyId and aws.secretKey)
-     * 3. The default credential profiles file (~/.aws/credentials)
-     * 4. Amazon ECS container credentials
-     * 5. Instance profile credentials
-     * </pre>
-     *
-     * @return the {@link DefaultAWSCredentialsProviderChain} if no other
-     *         {@link AWSCredentialsProvider} bean is registered.
+     * @return the {@link DefaultCredentialsProvider} if no other
+     *         {@link AwsCredentialsProvider} bean is registered.
      */
     @Bean
     @ConditionalOnMissingBean
-    public AWSCredentialsProvider awsCredentialsProvider() {
-        return new DefaultAWSCredentialsProviderChain();
+    public AwsCredentialsProvider awsCredentialsProvider() {
+        return DefaultCredentialsProvider.builder().build();
     }
 
     /**
-     * The default AmazonS3 client configuration, which declares the
+     * The default S3 client override configuration, which declares the
      * configuration for managing connection behavior to s3.
      *
-     * @return the default {@link ClientConfiguration} bean with the default
-     *         client configuration
+     * @return the default {@link ClientOverrideConfiguration} bean with the
+     *         default client configuration
      */
     @Bean
     @ConditionalOnMissingBean
-    public ClientConfiguration awsClientConfiguration() {
-        return new ClientConfiguration();
+    public ClientOverrideConfiguration clientOverrideConfiguration() {
+        return ClientOverrideConfiguration.builder().build();
     }
 
     /**
-     * @return the {@link AmazonS3} client if no other bean is registered.
+     * @return the {@link S3Client} if no other bean is registered.
      */
     @Bean
     @ConditionalOnMissingBean
-    public AmazonS3 amazonS3() {
-        final AmazonS3ClientBuilder s3ClientBuilder = AmazonS3ClientBuilder.standard()
-                .withCredentials(awsCredentialsProvider())
-                .withClientConfiguration(awsClientConfiguration());
+    public S3Client s3Client() {
+        final S3ClientBuilder s3ClientBuilder = S3Client.builder()
+                .credentialsProvider(awsCredentialsProvider())
+                .overrideConfiguration(clientOverrideConfiguration());
         if (StringUtils.hasLength(endpoint)) {
-            final String signingRegion = StringUtils.hasLength(region) ? region : "";
-            s3ClientBuilder.withEndpointConfiguration(new EndpointConfiguration(endpoint, signingRegion));
-        } else if (StringUtils.hasLength(region)) {
-            s3ClientBuilder.withRegion(region);
+            s3ClientBuilder.endpointOverride(URI.create(endpoint));
+        }
+        if (StringUtils.hasLength(region)) {
+            s3ClientBuilder.region(Region.of(region));
         }
         return s3ClientBuilder.build();
     }
@@ -98,6 +94,6 @@ public class S3RepositoryAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public ArtifactStorage artifactStorage(final S3RepositoryProperties s3Properties) {
-        return new S3Repository(amazonS3(), s3Properties);
+        return new S3Repository(s3Client(), s3Properties);
     }
 }

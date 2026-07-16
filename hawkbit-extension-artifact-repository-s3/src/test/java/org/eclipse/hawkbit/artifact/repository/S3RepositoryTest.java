@@ -12,7 +12,6 @@ package org.eclipse.hawkbit.artifact.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
@@ -39,15 +38,19 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.PutObjectRequest;
-import com.amazonaws.services.s3.model.PutObjectResult;
 import com.google.common.io.BaseEncoding;
 import com.google.common.io.ByteStreams;
 
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
 import io.qameta.allure.Story;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 
 /**
  * Test class for the {@link S3Repository}.
@@ -60,10 +63,10 @@ public class S3RepositoryTest {
     private static final String TENANT = "test_tenant";
 
     @Mock
-    private AmazonS3 amazonS3Mock;
+    private S3Client s3ClientMock;
 
     @Mock
-    private PutObjectResult putObjectResultMock;
+    private PutObjectResponse putObjectResponseMock;
 
     @Captor
     private ArgumentCaptor<PutObjectRequest> requestCaptor;
@@ -73,41 +76,41 @@ public class S3RepositoryTest {
 
     @BeforeEach
     public void before() {
-        amazonS3Mock = mock(AmazonS3.class);
-        s3RepositoryUnderTest = new S3Repository(amazonS3Mock, s3Properties);
+        s3ClientMock = mock(S3Client.class);
+        s3RepositoryUnderTest = new S3Repository(s3ClientMock, s3Properties);
     }
 
     @Test
-    @Description("Verifies that the amazonS3 client is called to put the object to S3 with the correct inputstream and meta-data")
+    @Description("Verifies that the S3 client is called to put the object to S3 with the correct inputstream and meta-data")
     public void storeInputStreamCallAmazonS3Client() throws IOException, NoSuchAlgorithmException {
         final byte[] rndBytes = randomBytes();
         final String knownSHA1 = getSha1OfBytes(rndBytes);
         final String knownContentType = "application/octet-stream";
 
-        when(amazonS3Mock.doesObjectExist(anyString(), anyString())).thenReturn(false);
-        when(amazonS3Mock.putObject(any(PutObjectRequest.class))).thenReturn(putObjectResultMock);
+        when(s3ClientMock.headObject(any(HeadObjectRequest.class))).thenThrow(NoSuchKeyException.builder().build());
+        when(s3ClientMock.putObject(any(PutObjectRequest.class), any(RequestBody.class))).thenReturn(putObjectResponseMock);
 
         storeRandomBytes(rndBytes, knownContentType);
 
-        Mockito.verify(amazonS3Mock).putObject(requestCaptor.capture());
+        Mockito.verify(s3ClientMock).putObject(requestCaptor.capture(), any(RequestBody.class));
 
         final PutObjectRequest putObjectRequest = requestCaptor.getValue();
-        assertThat(putObjectRequest.getBucketName()).isEqualTo(s3Properties.getBucketName());
-        assertThat(putObjectRequest.getKey()).isEqualTo(TENANT.toUpperCase() + "/" + knownSHA1);
-        assertThat(putObjectRequest.getMetadata().getContentType()).isEqualTo(knownContentType);
+        assertThat(putObjectRequest.bucket()).isEqualTo(s3Properties.getBucketName());
+        assertThat(putObjectRequest.key()).isEqualTo(TENANT.toUpperCase() + "/" + knownSHA1);
+        assertThat(putObjectRequest.contentType()).isEqualTo(knownContentType);
     }
 
     @Test
-    @Description("Verifies that the amazonS3 client is not called to put the object to S3 due the artifact already exists on S3")
+    @Description("Verifies that the S3 client is not called to put the object to S3 due the artifact already exists on S3")
     public void artifactIsNotUploadedIfAlreadyExists() throws NoSuchAlgorithmException, IOException {
         final byte[] rndBytes = randomBytes();
         final String knownContentType = "application/octet-stream";
 
-        when(amazonS3Mock.doesObjectExist(anyString(), anyString())).thenReturn(true);
+        when(s3ClientMock.headObject(any(HeadObjectRequest.class))).thenReturn(HeadObjectResponse.builder().build());
 
         storeRandomBytes(rndBytes, knownContentType);
 
-        Mockito.verify(amazonS3Mock, never()).putObject(any(PutObjectRequest.class));
+        Mockito.verify(s3ClientMock, never()).putObject(any(PutObjectRequest.class), any(RequestBody.class));
     }
 
     @Test
