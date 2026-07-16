@@ -2,12 +2,6 @@ name: Test Mongo
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - 'hawkbit-extension-artifact-repository-mongo/**'
-      - 'pom.xml'
-  pull_request:
     paths:
       - 'hawkbit-extension-artifact-repository-mongo/**'
       - 'pom.xml'

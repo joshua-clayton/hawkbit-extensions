@@ -2,12 +2,6 @@ name: Test Azure
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - 'hawkbit-extension-artifact-repository-azure/**'
-      - 'pom.xml'
-  pull_request:
     paths:
       - 'hawkbit-extension-artifact-repository-azure/**'
       - 'pom.xml'
