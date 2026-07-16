@@ -11,6 +11,7 @@ package org.eclipse.hawkbit.artifact.repository;
 
 import java.io.IOException;
 
+import org.eclipse.hawkbit.artifact.ArtifactStorage;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -33,7 +34,7 @@ public class GcsRepositoryAutoConfiguration {
 
     /**
      * GSC storage service
-     * 
+     *
      * @param gcsProperties
      *            properties to initialize GCS storage service
      * @return the {@link Storage} if no other {@link Storage} bean is registered.
@@ -43,27 +44,26 @@ public class GcsRepositoryAutoConfiguration {
     public Storage gcsStorage(final GcsRepositoryProperties gcsProperties) {
         if (gcsProperties.getCredentialsLocation() != null) {
             try {
-                Credentials credentials = GoogleCredentials
+                final Credentials credentials = GoogleCredentials
                         .fromStream(gcsProperties.getCredentialsLocation().getInputStream());
                 return StorageOptions.newBuilder().setCredentials(credentials)
                         .setProjectId(gcsProperties.getProjectId()).build().getService();
-            } catch (IOException e) {
+            } catch (final IOException e) {
                 throw new GcpInitialisationFailedException(e);
             }
-        } else {
-            return StorageOptions.getDefaultInstance().getService();
         }
+        return StorageOptions.getDefaultInstance().getService();
     }
 
     /**
      * GCS implementation for artifact repository
-     * 
+     *
      * @param gcsProperties
      *            properties to initialize GCS storage service
-     * @return google GCS repository {@link ArtifactRepository} implementation.
+     * @return google GCS repository {@link ArtifactStorage} implementation.
      */
     @Bean
-    public ArtifactRepository artifactRepository(final GcsRepositoryProperties gcsProperties) {
+    public ArtifactStorage artifactStorage(final GcsRepositoryProperties gcsProperties) {
         return new GcsRepository(gcsStorage(gcsProperties), gcsProperties);
     }
 }

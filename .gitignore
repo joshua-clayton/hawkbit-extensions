@@ -1,4 +1,5 @@
 # Directories #
+allure-results
 build
 bin
 tmp
@@ -60,3 +61,6 @@ hawkbit-extended-runtimes/hawkbit-update-server-azure/*.env
 # Intellij
 .idea
 *.iml
+
+#Merge artifacts
+*.orig

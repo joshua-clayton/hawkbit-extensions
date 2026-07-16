@@ -17,7 +17,7 @@
     <parent>
       <groupId>org.eclipse.hawkbit</groupId>
       <artifactId>hawkbit-parent</artifactId>
-      <version>0-SNAPSHOT</version>
+      <version>0.10.0</version>
     </parent>
 
     <artifactId>hawkbit-extensions-parent</artifactId>
@@ -36,30 +36,24 @@
 
     <distributionManagement>
         <repository>
-            <id>eclipserel</id>
-            <name>hawkBit Repository - Release</name>
-            <url>https://repo.eclipse.org/content/repositories/hawkbit-releases</url>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/joshua-clayton/hawkbit-extensions</url>
         </repository>
         <snapshotRepository>
-            <id>eclipsesnap</id>
-            <name>hawkBit Repository - Snapshots</name>
-            <url>https://repo.eclipse.org/content/repositories/hawkbit-snapshots</url>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/joshua-clayton/hawkbit-extensions</url>
         </snapshotRepository>
     </distributionManagement>
 
-    <pluginRepositories>
-        <pluginRepository>
-            <id>dash-licenses</id>
-            <url>https://repo.eclipse.org/content/repositories/dash-licenses</url>
-        </pluginRepository>
-    </pluginRepositories>
-
    <properties>
       <revision>0-SNAPSHOT</revision>
-      <hawkbit.version>0-SNAPSHOT</hawkbit.version>
+      <hawkbit.version>0.10.0</hawkbit.version>
       <maven.scm.plugin.version>2.0.1</maven.scm.plugin.version>
-      <aws.sdk.version>1.12.687</aws.sdk.version>
+      <aws.sdk.version>1.12.797</aws.sdk.version>
       <gcp.sdk.version>0.200.0</gcp.sdk.version>
+      <allure.version>2.25.0</allure.version>
 
       <guava.version>33.2.1-jre</guava.version>
 
@@ -113,40 +107,49 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <header>licenses/LICENSE_HEADER_TEMPLATE.txt</header>
-                    <validHeaders>
-                        <validHeader>licenses/LICENSE_HEADER_TEMPLATE_BOSCH_23.txt</validHeader>
-                        <validHeader>licenses/LICENSE_HEADER_TEMPLATE_BOSCH_20.txt</validHeader>
-                        <validHeader>licenses/LICENSE_HEADER_TEMPLATE_SIEMENS.txt</validHeader>
-                        <validHeader>licenses/LICENSE_HEADER_TEMPLATE_SIEMENS_18.txt</validHeader>
-                        <validHeader>licenses/LICENSE_HEADER_TEMPLATE_BOSCH.txt</validHeader>
-                        <validHeader>licenses/LICENSE_HEADER_TEMPLATE_BOSCH_18.txt</validHeader>
-                        <validHeader>licenses/LICENSE_HEADER_TEMPLATE_MICROSOFT_20.txt</validHeader>
-                        <validHeader>licenses/LICENSE_HEADER_TEMPLATE_MICROSOFT_18.txt</validHeader>
-                        <validHeader>licenses/LICENSE_HEADER_TEMPLATE_RICO_PAHLISCH.txt</validHeader>
-                    </validHeaders>
-                    <excludes>
-                        <exclude>**/helm/**</exclude>
-                        <exclude>**/README</exclude>
-                        <exclude>.3rd-party/**</exclude>
-                        <exclude>.github/**</exclude>
-                        <exclude>**/.git*</exclude>
-                        <exclude>.git*</exclude>
-                        <exclude>**/*.sql</exclude>
-                        <exclude>eclipse_codeformatter.xml</exclude>
-                        <exclude>**/addons.scss</exclude>
-                        <exclude>**/VAADIN/widgetsets/**</exclude>
-                        <exclude>.sonar</exclude>
-                        <exclude>**/Dockerfile</exclude>
-                        <exclude>**/docker-compose.yml</exclude>
-                        <exclude>**/docker-compose-stack.yml</exclude>
-                        <exclude>**/.sonar/**</exclude>
-                        <exclude>docs/content/**</exclude>
-                        <exclude>docs/layouts/**</exclude>
-                        <exclude>docs/static/**</exclude>
-                        <exclude>docs/*.toml</exclude>
-                        <exclude>**/LICENSE*</exclude>
-                    </excludes>
+                    <mapping>
+                        <java>JAVADOC_STYLE</java>
+                    </mapping>
+                    <licenseSets>
+                        <licenseSet>
+                            <header>licenses/LICENSE_HEADER_TEMPLATE.txt</header>
+                            <validHeaders>
+                                <validHeader>licenses/LICENSE_HEADER_TEMPLATE_BOSCH_23.txt</validHeader>
+                                <validHeader>licenses/LICENSE_HEADER_TEMPLATE_BOSCH_20.txt</validHeader>
+                                <validHeader>licenses/LICENSE_HEADER_TEMPLATE_SIEMENS.txt</validHeader>
+                                <validHeader>licenses/LICENSE_HEADER_TEMPLATE_SIEMENS_18.txt</validHeader>
+                                <validHeader>licenses/LICENSE_HEADER_TEMPLATE_BOSCH.txt</validHeader>
+                                <validHeader>licenses/LICENSE_HEADER_TEMPLATE_BOSCH_18.txt</validHeader>
+                                <validHeader>licenses/LICENSE_HEADER_TEMPLATE_MICROSOFT_20.txt</validHeader>
+                                <validHeader>licenses/LICENSE_HEADER_TEMPLATE_MICROSOFT_18.txt</validHeader>
+                                <validHeader>licenses/LICENSE_HEADER_TEMPLATE_RICO_PAHLISCH.txt</validHeader>
+                            </validHeaders>
+                            <excludes>
+                                <exclude>**/helm/**</exclude>
+                                <exclude>**/README</exclude>
+                                <exclude>.3rd-party/**</exclude>
+                                <exclude>.github/**</exclude>
+                                <exclude>**/.git*</exclude>
+                                <exclude>.git*</exclude>
+                                <exclude>**/*.sql</exclude>
+                                <exclude>eclipse_codeformatter.xml</exclude>
+                                <exclude>**/addons.scss</exclude>
+                                <exclude>**/VAADIN/widgetsets/**</exclude>
+                                <exclude>.sonar</exclude>
+                                <exclude>**/Dockerfile</exclude>
+                                <exclude>**/docker-compose.yml</exclude>
+                                <exclude>**/docker-compose-stack.yml</exclude>
+                                <exclude>**/.sonar/**</exclude>
+                                <exclude>docs/content/**</exclude>
+                                <exclude>docs/layouts/**</exclude>
+                                <exclude>docs/static/**</exclude>
+                                <exclude>docs/*.toml</exclude>
+                                <exclude>**/LICENSE*</exclude>
+                                <exclude>**/*.orig</exclude>
+                                <exclude>**/*.imports</exclude>
+                            </excludes>
+                        </licenseSet>
+                    </licenseSets>
                 </configuration>
             </plugin>
             <plugin>
@@ -253,19 +256,6 @@
                     </execution>
                 </executions>
             </plugin>
-            <plugin>
-                <groupId>org.eclipse.dash</groupId>
-                <artifactId>license-tool-plugin</artifactId>
-                <version>1.0.2</version>
-                <executions>
-                    <execution>
-                        <id>license-check</id>
-                        <goals>
-                            <goal>license-check</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
         </plugins>
 
         <pluginManagement>
@@ -312,6 +302,12 @@
                 <artifactId>hawkbit-security-core</artifactId>
                 <version>${hawkbit.version}</version>
                 <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.qameta.allure</groupId>
+                <artifactId>allure-junit5</artifactId>
+                <version>${allure.version}</version>
+                <scope>test</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>

@@ -1,12 +1,8 @@
 <img src=hawkbit_logo.png width=533 height=246 />
 
-# 🚨 Deprecated
-
-⚠️ This repository is **no longer maintained** and is deprecated.  
-
 # Eclipse hawkBit™ - Extensions collection
 
-Build: [![Circle CI](https://circleci.com/gh/eclipse/hawkbit-extensions.svg?style=shield)](https://circleci.com/gh/eclipse/hawkbit-extensions)
+> **Fork notice:** The [original repository](https://github.com/eclipse/hawkbit-extensions) has been deprecated and is no longer maintained. This is an actively maintained fork by [@joshua-clayton](https://github.com/joshua-clayton).
 
 [hawkBit](https://github.com/eclipse/hawkbit) extensions are implementations to extend the functionality of hawkBit which are maintained by the hawkBit community. The extensions can be used to integrate in a hawkBit application to exchange or extend hawkBit functionality. Extensions should work with the standard [hawkBit runtime](https://github.com/eclipse/hawkbit/tree/master/hawkbit-runtime/hawkbit-update-server). All extensions provide a `README.md` which explains the use of the extension and how to use them.
 

@@ -10,6 +10,7 @@
 package org.eclipse.hawkbit.artifact.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -20,14 +21,15 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Random;
 
-import io.qameta.allure.Description;
 import org.eclipse.hawkbit.artifact.TestConfiguration;
-import org.eclipse.hawkbit.artifact.repository.model.AbstractDbArtifact;
-import org.eclipse.hawkbit.artifact.repository.model.DbArtifactHash;
+import org.eclipse.hawkbit.artifact.exception.ArtifactBinaryNotFoundException;
+import org.eclipse.hawkbit.artifact.model.ArtifactHashes;
+import org.eclipse.hawkbit.artifact.model.StoredArtifactInfo;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
 import io.qameta.allure.Step;
 import io.qameta.allure.Story;
@@ -35,8 +37,7 @@ import io.qameta.allure.Story;
 @Feature("Component Tests - Repository")
 @Story("Artifact Store MongoDB")
 @SpringBootTest(classes = {MongoDBArtifactStoreAutoConfiguration.class, TestConfiguration.class}, properties = {
-        "de.flapdoodle.mongodb.embedded.version=3.6.23",
-        "spring.mongodb.embedded.features=sync_delay,no_http_interface_arg"})
+        "spring.data.mongodb.uri=mongodb://localhost:27017/artifactrepo"})
 public class MongoDBArtifactStoreTest {
     private static final String TENANT = "test_tenant";
     private static final String TENANT2 = "test_tenant2";
@@ -47,42 +48,44 @@ public class MongoDBArtifactStoreTest {
     @Test
     @Description("Ensures that search by SHA1 hash (which is used by hawkBit as artifact ID) finds the expected results.")
     public void findArtifactBySHA1Hash() throws NoSuchAlgorithmException, IOException {
-
         final String sha1 = storeRandomArtifactAndVerify(TENANT);
         final String sha2 = storeRandomArtifactAndVerify(TENANT2);
 
-        assertThat(artifactStoreUnderTest.getArtifactBySha1(TENANT2, sha1)).isNull();
-        assertThat(artifactStoreUnderTest.getArtifactBySha1(TENANT, sha2)).isNull();
+        assertThatThrownBy(() -> artifactStoreUnderTest.getBySha1(TENANT2, sha1))
+                .isInstanceOf(ArtifactBinaryNotFoundException.class);
+        assertThatThrownBy(() -> artifactStoreUnderTest.getBySha1(TENANT, sha2))
+                .isInstanceOf(ArtifactBinaryNotFoundException.class);
     }
 
     @Test
     @Description("Deletes file from repository identified by SHA1 hash as filename.")
     public void deleteArtifactBySHA1Hash() throws NoSuchAlgorithmException, IOException {
-
         final String sha1 = storeRandomArtifactAndVerify(TENANT);
 
         artifactStoreUnderTest.deleteBySha1(TENANT, sha1);
-        assertThat(artifactStoreUnderTest.getArtifactBySha1(TENANT, sha1)).isNull();
+        assertThatThrownBy(() -> artifactStoreUnderTest.getBySha1(TENANT, sha1))
+                .isInstanceOf(ArtifactBinaryNotFoundException.class);
     }
 
     @Test
     @Description("Verfies that all data of a tenant is erased if repository is asked to do so. "
             + "Data of other tenants is not affected.")
     public void deleteTenant() throws NoSuchAlgorithmException, IOException {
-
         final String shaDeleted = storeRandomArtifactAndVerify(TENANT);
         final String shaUndeleted = storeRandomArtifactAndVerify("another_tenant");
 
         artifactStoreUnderTest.deleteByTenant("tenant_that_does_not_exist");
         artifactStoreUnderTest.deleteByTenant(TENANT);
-        assertThat(artifactStoreUnderTest.getArtifactBySha1(TENANT, shaDeleted)).isNull();
-        assertThat(artifactStoreUnderTest.getArtifactBySha1("another_tenant", shaUndeleted)).isNotNull();
+        assertThatThrownBy(() -> artifactStoreUnderTest.getBySha1(TENANT, shaDeleted))
+                .isInstanceOf(ArtifactBinaryNotFoundException.class);
+        try (InputStream is = artifactStoreUnderTest.getBySha1("another_tenant", shaUndeleted)) {
+            assertThat(is).isNotNull();
+        }
     }
 
     @Test
     @Description("Verfies that artifacts with equal binary content are only stored once.")
     public void storeSameArtifactMultipleTimes() throws NoSuchAlgorithmException, IOException {
-
         final byte[] bytes = new byte[128];
         new Random().nextBytes(bytes);
 
@@ -90,16 +93,14 @@ public class MongoDBArtifactStoreTest {
         final MessageDigest mdSHA256 = MessageDigest.getInstance("SHA-256");
         final MessageDigest mdMD5 = MessageDigest.getInstance("MD5");
         final HexFormat hexFormat = HexFormat.of().withLowerCase();
-        final DbArtifactHash hash = new DbArtifactHash(hexFormat.formatHex(mdSHA1.digest(bytes)),
-                hexFormat.formatHex(mdMD5.digest(bytes)),
-                hexFormat.formatHex(mdSHA256.digest(bytes)));
+        final ArtifactHashes hash = new ArtifactHashes(hexFormat.formatHex(mdSHA1.digest(bytes)),
+                hexFormat.formatHex(mdMD5.digest(bytes)), hexFormat.formatHex(mdSHA256.digest(bytes)));
 
-        final AbstractDbArtifact artifact1 = storeArtifact(TENANT, "file1.txt", new ByteArrayInputStream(bytes), mdSHA1,
+        final StoredArtifactInfo result1 = storeArtifact(TENANT, "file1.txt", new ByteArrayInputStream(bytes), mdSHA1,
                 mdMD5, hash);
-        final AbstractDbArtifact artifact2 = storeArtifact(TENANT, "file2.bla", new ByteArrayInputStream(bytes), mdSHA1,
+        final StoredArtifactInfo result2 = storeArtifact(TENANT, "file2.bla", new ByteArrayInputStream(bytes), mdSHA1,
                 mdMD5, hash);
-        assertThat(artifact1.getArtifactId()).isEqualTo(artifact2.getArtifactId());
-
+        assertThat(result1.getHashes().sha1()).isEqualTo(result2.getHashes().sha1());
     }
 
     @Step
@@ -109,26 +110,26 @@ public class MongoDBArtifactStoreTest {
         final MessageDigest mdSHA1 = MessageDigest.getInstance("SHA1");
         final MessageDigest mdMD5 = MessageDigest.getInstance("MD5");
 
-        storeArtifact(tenant, filename, generateInputStream(filelengthBytes), mdSHA1, mdMD5, null);
+        final StoredArtifactInfo stored = storeArtifact(tenant, filename, generateInputStream(filelengthBytes), mdSHA1,
+                mdMD5, null);
 
         final HexFormat hexFormat = HexFormat.of().withLowerCase();
         final String sha1Hash16 = hexFormat.formatHex(mdSHA1.digest());
-        final String md5Hash16 = hexFormat.formatHex(mdMD5.digest());
 
-        final AbstractDbArtifact loaded = artifactStoreUnderTest.getArtifactBySha1(tenant, sha1Hash16);
-        assertThat(loaded).isNotNull();
-        assertThat(loaded.getContentType()).isEqualTo("application/json");
-        assertThat(loaded.getHashes().getSha1()).isEqualTo(sha1Hash16);
-        assertThat(loaded.getHashes().getMd5()).isNull();
-        assertThat(loaded.getSize()).isEqualTo(filelengthBytes);
+        assertThat(stored.getContentType()).isEqualTo("application/json");
+        assertThat(stored.getHashes().sha1()).isEqualTo(sha1Hash16);
+        assertThat(stored.getSize()).isEqualTo(filelengthBytes);
+        try (InputStream is = artifactStoreUnderTest.getBySha1(tenant, sha1Hash16)) {
+            assertThat(is).isNotNull();
+        }
 
         return sha1Hash16;
     }
 
-    private AbstractDbArtifact storeArtifact(final String tenant, final String filename, final InputStream content,
-            final MessageDigest sha1, final MessageDigest md5, final DbArtifactHash hash)
+    private StoredArtifactInfo storeArtifact(final String tenant, final String filename, final InputStream content,
+            final MessageDigest sha1, final MessageDigest md5, final ArtifactHashes hash)
             throws NoSuchAlgorithmException, IOException {
-        try (final DigestInputStream digestInputStream = wrapInDigestInputStream(content, sha1, md5)) {
+        try (DigestInputStream digestInputStream = wrapInDigestInputStream(content, sha1, md5)) {
             return artifactStoreUnderTest.store(tenant, digestInputStream, filename, "application/json", hash);
         }
     }
