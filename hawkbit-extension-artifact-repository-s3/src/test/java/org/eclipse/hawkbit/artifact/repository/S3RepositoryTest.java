@@ -48,6 +48,8 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
@@ -111,6 +113,35 @@ public class S3RepositoryTest {
         storeRandomBytes(rndBytes, knownContentType);
 
         Mockito.verify(s3ClientMock, never()).putObject(any(PutObjectRequest.class), any(RequestBody.class));
+    }
+
+    @Test
+    @Description("Verifies that a lowercase tenant is normalized to the same key as an uppercase tenant")
+    public void existsBySha1NormalizesTenantCasing() {
+        final String sha1 = "abc123";
+
+        when(s3ClientMock.headObject(any(HeadObjectRequest.class))).thenReturn(HeadObjectResponse.builder().build());
+
+        s3RepositoryUnderTest.existsBySha1("lowertenant", sha1);
+
+        final ArgumentCaptor<HeadObjectRequest> headRequestCaptor = ArgumentCaptor.forClass(HeadObjectRequest.class);
+        Mockito.verify(s3ClientMock).headObject(headRequestCaptor.capture());
+        assertThat(headRequestCaptor.getValue().key()).isEqualTo("LOWERTENANT/" + sha1);
+    }
+
+    @Test
+    @Description("Verifies that deleteByTenant normalizes the tenant when building the list prefix")
+    public void deleteByTenantNormalizesTenantCasing() {
+        final S3Client paginatorCapableMock = mock(S3Client.class, Mockito.CALLS_REAL_METHODS);
+        Mockito.doReturn(ListObjectsV2Response.builder().isTruncated(false).build())
+                .when(paginatorCapableMock).listObjectsV2(any(ListObjectsV2Request.class));
+        final S3Repository repositoryWithMock = new S3Repository(paginatorCapableMock, s3Properties);
+
+        repositoryWithMock.deleteByTenant("lowertenant");
+
+        final ArgumentCaptor<ListObjectsV2Request> listRequestCaptor = ArgumentCaptor.forClass(ListObjectsV2Request.class);
+        Mockito.verify(paginatorCapableMock).listObjectsV2(listRequestCaptor.capture());
+        assertThat(listRequestCaptor.getValue().prefix()).isEqualTo("LOWERTENANT/");
     }
 
     @Test
