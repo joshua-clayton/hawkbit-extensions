@@ -9,6 +9,7 @@
  */
 package org.eclipse.hawkbit.artifact.repository;
 
+import org.eclipse.hawkbit.artifact.ArtifactStorage;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.mongo.MongoProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -27,10 +28,10 @@ import org.springframework.data.mongodb.gridfs.GridFsOperations;
 public class MongoDBArtifactStoreAutoConfiguration {
 
     /**
-     * @return Default {@link ArtifactRepository} implementation.
+     * @return Default {@link ArtifactStorage} implementation.
      */
     @Bean
-    ArtifactRepository artifactRepository(final GridFsOperations gridFs) {
+    ArtifactStorage artifactStorage(final GridFsOperations gridFs) {
         return new MongoDBArtifactStore(gridFs);
     }
 }
