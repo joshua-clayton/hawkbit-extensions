@@ -82,7 +82,7 @@ public class S3Repository extends AbstractArtifactStorage {
     @Override
     public void deleteByTenant(final String tenant) {
         try {
-            final String prefix = tenant + "/";
+            final String prefix = sanitizeTenant(tenant) + "/";
             s3Client.listObjectsV2Paginator(ListObjectsV2Request.builder()
                             .bucket(s3Properties.getBucketName())
                             .prefix(prefix)
@@ -131,6 +131,6 @@ public class S3Repository extends AbstractArtifactStorage {
     }
 
     private String buildKey(final String tenant, final String sha1) {
-        return tenant + "/" + sha1;
+        return sanitizeTenant(tenant) + "/" + sha1;
     }
 }
