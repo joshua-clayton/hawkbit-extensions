@@ -37,7 +37,7 @@ import io.qameta.allure.Story;
 @Feature("Component Tests - Repository")
 @Story("Artifact Store MongoDB")
 @SpringBootTest(classes = {MongoDBArtifactStoreAutoConfiguration.class, TestConfiguration.class}, properties = {
-        "de.flapdoodle.mongodb.embedded.version=7.0.0"})
+        "de.flapdoodle.mongodb.embedded.version=8.0.0"})
 public class MongoDBArtifactStoreTest {
     private static final String TENANT = "test_tenant";
     private static final String TENANT2 = "test_tenant2";
