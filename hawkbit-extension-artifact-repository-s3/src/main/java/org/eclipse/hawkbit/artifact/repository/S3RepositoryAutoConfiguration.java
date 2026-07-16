@@ -1,6 +1,5 @@
 /**
  * Copyright (c) 2015 Bosch Software Innovations GmbH and others
- * Patched for hawkbit 0.10.0 compatibility
  *
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
