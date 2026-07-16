@@ -8,11 +8,18 @@ on:
   pull_request:
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     permissions:
       checks: write
       pull-requests: write
+    strategy:
+      matrix:
+        module:
+          - hawkbit-extension-artifact-repository-s3
+          - hawkbit-extension-artifact-repository-azure
+          - hawkbit-extension-artifact-repository-mongo
+          - hawkbit-extension-artifact-repository-gcs
 
     steps:
       - uses: actions/checkout@v7
@@ -23,11 +30,29 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build, test, and check licenses
-        run: mvn verify license:check --batch-mode -DsnapshotDependencyAllowed=true
+      - name: Test ${{ matrix.module }}
+        env:
+          MODULE: ${{ matrix.module }}
+        run: mvn verify --batch-mode -DsnapshotDependencyAllowed=true -pl $MODULE -am
 
       - name: Publish test results
         if: always()
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
+          check_name: Test Results (${{ matrix.module }})
           files: '**/target/surefire-reports/*.xml'
+
+  license-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Check license headers
+        run: mvn license:check --batch-mode -DsnapshotDependencyAllowed=true
